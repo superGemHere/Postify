@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "client",
-    "slug": "client",
+    "name": "Postify",
+    "slug": "Postify",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "client",
+    "scheme": "Postify",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
