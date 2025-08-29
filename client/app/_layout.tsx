@@ -10,6 +10,8 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    Instagram: require('../assets/fonts/Instagram-Bold.otf'),
+    Dynalight: require('../assets/fonts/Dynalight-Regular.ttf'),
   });
 
   if (!loaded) {
