@@ -6,6 +6,12 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 
+import { useAuthStore } from '../store/authStore';
+import AuthScreen from './screens/Auth';
+import { useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
@@ -13,10 +19,27 @@ export default function RootLayout() {
     Instagram: require('../assets/fonts/Instagram-Bold.otf'),
     Dynalight: require('../assets/fonts/Dynalight-Regular.ttf'),
   });
+  const user = useAuthStore((state) => state.user);
+  useEffect(() => {
+    const restoreSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session && data.session.user) {
+        useAuthStore.setState({
+          user: { id: data.session.user.id, email: data.session.user.email ?? '' },
+          token: data.session.access_token,
+        });
+      }
+    };
+    if (!user) restoreSession();
+  }, [user]);
 
   if (!loaded) {
     // Async font loading only occurs in development.
     return null;
+  }
+
+  if (!user) {
+    return <AuthScreen />;
   }
 
   return (
