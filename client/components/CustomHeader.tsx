@@ -4,10 +4,12 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuthStore } from '../store/authStore'
 import { GradientTitle } from './GradientTitle'
 import { SlideInDrawer } from './SlideInDrawer'
+import { useRouter } from 'expo-router'
 
 const CustomHeader = (): JSX.Element => {
   const [drawerVisible, setDrawerVisible] = useState<boolean>(false)
   const logout = useAuthStore((state) => state.logout)
+  const router = useRouter()
 
   return (
     <View style={styles.headerContainer}>
@@ -31,6 +33,36 @@ const CustomHeader = (): JSX.Element => {
             style={{ marginRight: 8 }}
           />
           <Text style={styles.drawerItemText}>Logout</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.drawerItem}
+          onPress={() => {
+            setDrawerVisible(false)
+            router.push('/screens/UploadSinglePhotoScreen')
+          }}
+        >
+          <Ionicons name="image-outline" size={22} color="#222" style={{ marginRight: 8 }} />
+          <Text style={styles.drawerItemText}>Upload Single Photo</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.drawerItem}
+          onPress={() => {
+            setDrawerVisible(false)
+            router.push('/screens/UploadMultiplePhotosScreen')
+          }}
+        >
+          <Ionicons name="images-outline" size={22} color="#222" style={{ marginRight: 8 }} />
+          <Text style={styles.drawerItemText}>Upload Multiple Photos</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.drawerItem}
+          onPress={() => {
+            setDrawerVisible(false)
+            router.push('/screens/UploadVideoScreen')
+          }}
+        >
+          <Ionicons name="videocam-outline" size={22} color="#222" style={{ marginRight: 8 }} />
+          <Text style={styles.drawerItemText}>Upload Video</Text>
         </TouchableOpacity>
       </SlideInDrawer>
     </View>
