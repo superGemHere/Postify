@@ -48,6 +48,16 @@ const CustomHeader = (): JSX.Element => {
           style={styles.drawerItem}
           onPress={() => {
             setDrawerVisible(false)
+            router.push('/screens/UploadSinglePhotoScreen_fs')
+          }}
+        >
+          <Ionicons name="image-outline" size={22} color="#222" style={{ marginRight: 8 }} />
+          <Text style={styles.drawerItemText}>Upload Single Photo FS</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.drawerItem}
+          onPress={() => {
+            setDrawerVisible(false)
             router.push('/screens/UploadMultiplePhotosScreen')
           }}
         >
