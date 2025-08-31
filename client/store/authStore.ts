@@ -67,6 +67,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ error: customError, loading: false });
         return;
       }
+      // Insert into public profiles table
+      await supabase.from('profiles').upsert({
+        id: data.user.id,
+        email: data.user.email ?? email,
+        username: name,
+      });
       set({
         user: { id: data.user.id, email: data.user.email ?? '', name },
         token: data.session?.access_token ?? null,
