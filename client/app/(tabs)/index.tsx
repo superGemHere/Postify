@@ -1,16 +1,20 @@
-
-
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
+import { usePostStore } from '../../store/postStore';
 import PostCard from '@/components/PostCard';
 import { Post, Like, Comment } from '@/types/Post';
 
 export default function FeedScreen() {
 	const [posts, setPosts] = useState<Post[]>([]);
-	const [likes, setLikes] = useState<{ [postId: string]: Like[] }>({});
-	const [comments, setComments] = useState<{ [postId: string]: Comment[] }>({});
+	const likes = usePostStore(state => state.likes);
+	const addLikeOrToggle = usePostStore(state => state.addLikeOrToggle);
+	const comments = usePostStore(state => state.comments);
+	const addComment = usePostStore(state => state.addComment);
+const replaceComment = usePostStore(state => state.replaceComment);
+	const setLikes = usePostStore(state => state.setLikes);
+	const setComments = usePostStore(state => state.setComments);
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
@@ -20,7 +24,6 @@ export default function FeedScreen() {
 	const user = useAuthStore(state => state.user);
 	const [userMap, setUserMap] = useState<{ [id: string]: { username: string; email: string } }>({});
 
-	// Fetch userMap from profiles table
 	const fetchUserMap = async (userIds: string[]) => {
 		if (userIds.length === 0) return;
 		const uniqueIds = Array.from(new Set(userIds));
@@ -57,9 +60,82 @@ export default function FeedScreen() {
 			setPosts(postsWithArray as Post[]);
 			// Fetch userMap for post authors
 			const postUserIds = postsWithArray.map(p => p.user_id);
-			fetchUserMap(postUserIds);
+			const postIds = postsWithArray.map(p => p.id);
+			
+			await Promise.all([
+				fetchUserMap(postUserIds),
+				fetchAllLikes(postIds),
+				fetchAllComments(postIds)
+			]);
 		}
 		setLoading(false);
+	};
+
+	const fetchAllLikes = async (postIds: string[]) => {
+		if (postIds.length === 0) return;
+		const { data, error } = await supabase
+			.from('likes')
+			.select('*')
+			.in('post_id', postIds);
+		if (!error && data) {
+			// Group likes by post_id
+			const likesByPost: { [postId: string]: Like[] } = {};
+			(data as Like[]).forEach(like => {
+				if (!likesByPost[like.post_id]) {
+					likesByPost[like.post_id] = [];
+				}
+				likesByPost[like.post_id].push(like);
+			});
+			// Set all likes at once
+			Object.entries(likesByPost).forEach(([postId, likes]) => {
+				setLikes(postId, likes);
+			});
+		}
+	};
+
+	const fetchAllComments = async (postIds: string[]) => {
+		if (postIds.length === 0) return;
+		const { data, error } = await supabase
+			.from('comments')
+			.select('*')
+			.in('post_id', postIds)
+			.order('created_at', { ascending: true });
+		if (!error && data) {
+			// Group comments by post_id and build nested structure
+			const commentsByPost: { [postId: string]: Comment[] } = {};
+			
+			// Build nested replies for each post
+			const postIdsFromComments = [...new Set((data as Comment[]).map(c => c.post_id))];
+			postIdsFromComments.forEach(postId => {
+				const postComments = (data as Comment[]).filter(c => c.post_id === postId);
+				const commentMap: { [id: string]: Comment } = {};
+				const rootComments: Comment[] = [];
+				
+				postComments.forEach(comment => {
+					comment.replies = [];
+					commentMap[comment.id] = comment;
+				});
+				
+				postComments.forEach(comment => {
+					if (comment.parent_id && commentMap[comment.parent_id]) {
+						commentMap[comment.parent_id].replies!.push(comment);
+					} else {
+						rootComments.push(comment);
+					}
+				});
+				
+				commentsByPost[postId] = rootComments;
+			});
+			
+			// Set all comments at once
+			Object.entries(commentsByPost).forEach(([postId, comments]) => {
+				setComments(postId, comments);
+			});
+			
+			// Fetch userMap for comment authors
+			const commentUserIds = (data as Comment[]).map((c: any) => c.user_id);
+			fetchUserMap(commentUserIds);
+		}
 	};
 
 	const fetchLikes = async (postId: string) => {
@@ -68,7 +144,7 @@ export default function FeedScreen() {
 			.select('*')
 			.eq('post_id', postId);
 		if (!error && data) {
-			setLikes(prev => ({ ...prev, [postId]: data as Like[] }));
+			setLikes(postId, data as Like[]);
 		}
 	};
 
@@ -93,23 +169,13 @@ export default function FeedScreen() {
 					rootComments.push(comment);
 				}
 			});
-			setComments(prev => ({ ...prev, [postId]: rootComments }));
-			// Fetch userMap for comment authors
-			const commentUserIds = (data as Comment[]).map((c: any) => c.user_id);
-			fetchUserMap(commentUserIds);
+			setComments(postId, rootComments);
 		}
 	};
 
 	useEffect(() => {
 		fetchPosts();
 	}, []);
-
-	useEffect(() => {
-		posts.forEach(post => {
-			fetchLikes(post.id);
-			fetchComments(post.id);
-		});
-	}, [posts]);
 
 	const onRefresh = async () => {
 		setRefreshing(true);
@@ -119,38 +185,63 @@ export default function FeedScreen() {
 
 
 
-		const handleLike = async (postId: string) => {
-			if (!user) return;
-			const user_id = user.id;
-			const alreadyLiked = likes[postId]?.some(like => like.user_id === user_id);
-			if (alreadyLiked) {
-				// Dislike (remove like)
-				const like = likes[postId]?.find(like => like.user_id === user_id);
-				if (like) {
-					const { error } = await supabase.from('likes').delete().eq('id', like.id);
-					if (!error) fetchLikes(postId);
-				}
-				return;
-			}
-			// Like
-			const { error } = await supabase.from('likes').insert([{ post_id: postId, user_id }]);
-			if (!error) fetchLikes(postId);
-		};
-
-		const handleAddComment = async (postId: string) => {
+const handleLike = async (postId: string) => {
+    if (!user) return;
+    const user_id = user.id;
+    const alreadyLiked = likes[postId]?.some(like => like.user_id === user_id);
+    
+    if (alreadyLiked) {
+        // Unlike: remove from local state first
+        addLikeOrToggle(postId, undefined, user_id);
+        // Remove like from Supabase
+        await supabase.from('likes').delete().eq('post_id', postId).eq('user_id', user_id);
+    } else {
+        // Like: add to local state first
+        const newLike = {
+            id: Math.random().toString(36).slice(2),
+            post_id: postId,
+            user_id,
+            created_at: new Date().toISOString(),
+        };
+        addLikeOrToggle(postId, newLike, user_id);
+        // Add like to Supabase
+        await supabase.from('likes').insert([{ post_id: postId, user_id }]);
+    }
+};		const handleAddComment = async (postId: string) => {
 			if (!user) return;
 			const user_id = user.id;
 			const content = commentInputs[postId]?.trim();
 			if (!content) return;
 
 			const parent_id = replyingTo[postId] || null;
-			const { error } = await supabase.from('comments').insert([
+			
+			// Optimistic update first for instant UI
+			const tempId = Math.random().toString(36).slice(2);
+			const tempComment = {
+				id: tempId,
+				post_id: postId,
+				user_id,
+				content,
+				parent_id,
+				created_at: new Date().toISOString(),
+				replies: [],
+			};
+			addComment(postId, tempComment);
+			setCommentInputs(inputs => ({ ...inputs, [postId]: '' }));
+			setReplyingTo(inputs => ({ ...inputs, [postId]: null }));
+			
+			// Then sync with database in background
+			const { data, error } = await supabase.from('comments').insert([
 				{ post_id: postId, user_id, content, parent_id },
-			]);
-			if (!error) {
-				fetchComments(postId);
-				setCommentInputs(inputs => ({ ...inputs, [postId]: '' }));
-				setReplyingTo(inputs => ({ ...inputs, [postId]: null }));
+			]).select();
+			
+			if (!error && data && data.length > 0) {
+				// Replace temp comment with real one
+				const realComment = {
+					...data[0],
+					replies: [],
+				};
+				replaceComment(postId, tempId, realComment);
 			}
 		};
 
