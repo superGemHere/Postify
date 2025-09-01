@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { usePostStore } from '../../store/postStore';
@@ -17,12 +17,16 @@ const replaceComment = usePostStore(state => state.replaceComment);
 	const setComments = usePostStore(state => state.setComments);
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const [hasMore, setHasMore] = useState(true);
 	const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
 
 	const [replyingTo, setReplyingTo] = useState<{ [postId: string]: string | null }>({});
 
 	const user = useAuthStore(state => state.user);
 	const [userMap, setUserMap] = useState<{ [id: string]: { username: string; email: string } }>({});
+
+	const POSTS_PER_PAGE = 20;
 
 	const fetchUserMap = async (userIds: string[]) => {
 		if (userIds.length === 0) return;
@@ -41,12 +45,20 @@ const replaceComment = usePostStore(state => state.replaceComment);
 	};
 
 
-	const fetchPosts = async () => {
-		setLoading(true);
+	const fetchPosts = async (isLoadMore = false) => {
+		if (isLoadMore) {
+			setLoadingMore(true);
+		} else {
+			setLoading(true);
+		}
+		
+		const offset = isLoadMore ? posts.length : 0;
 		const { data, error } = await supabase
 			.from('posts')
 			.select('*')
-			.order('created_at', { ascending: false });
+			.order('created_at', { ascending: false })
+			.range(offset, offset + POSTS_PER_PAGE - 1);
+			
 		if (!error && data) {
 			// Ensure media_urls is always an array
 			const postsWithArray = (data as any[]).map(post => ({
@@ -57,7 +69,16 @@ const replaceComment = usePostStore(state => state.replaceComment);
 						? [post.media_url]
 						: [],
 			}));
-			setPosts(postsWithArray as Post[]);
+			
+			if (isLoadMore) {
+				setPosts(prev => [...prev, ...postsWithArray]);
+			} else {
+				setPosts(postsWithArray as Post[]);
+			}
+			
+			// Check if there are more posts
+			setHasMore(data.length === POSTS_PER_PAGE);
+			
 			// Fetch userMap for post authors
 			const postUserIds = postsWithArray.map(p => p.user_id);
 			const postIds = postsWithArray.map(p => p.id);
@@ -68,7 +89,12 @@ const replaceComment = usePostStore(state => state.replaceComment);
 				fetchAllComments(postIds)
 			]);
 		}
-		setLoading(false);
+		
+		if (isLoadMore) {
+			setLoadingMore(false);
+		} else {
+			setLoading(false);
+		}
 	};
 
 	const fetchAllLikes = async (postIds: string[]) => {
@@ -179,9 +205,52 @@ const replaceComment = usePostStore(state => state.replaceComment);
 
 	const onRefresh = async () => {
 		setRefreshing(true);
+		setHasMore(true);
 		await fetchPosts();
 		setRefreshing(false);
 	};
+
+	const loadMore = () => {
+		if (!loadingMore && hasMore) {
+			fetchPosts(true);
+		}
+	};
+
+	const renderPost = ({ item }: { item: Post }) => (
+		<PostCard
+			key={item.id}
+			user={user}
+			post={item}
+			userMap={userMap}
+			renderComments={renderComments}
+			likes={likes}
+			comments={comments}
+			handleLike={handleLike}
+			handleAddComment={handleAddComment}
+			commentInputs={commentInputs}
+			setCommentInputs={setCommentInputs}
+			replyingTo={replyingTo}
+			setReplyingTo={setReplyingTo}
+		/>
+	);
+
+	const renderFooter = () => {
+		if (!loadingMore) return null;
+		return (
+			<View style={styles.loadingMore}>
+				<ActivityIndicator size="small" color="#007bff" />
+			</View>
+		);
+	};
+
+	const renderHeader = () => (
+		<View>
+			<Text style={styles.header}>Feed</Text>
+			{posts.length === 0 && (
+				<Text style={styles.empty}>No posts yet.</Text>
+			)}
+		</View>
+	);
 
 
 
@@ -310,32 +379,17 @@ const handleLike = async (postId: string) => {
 	}
 
 	return (
-		<ScrollView
+		<FlatList
+			data={posts}
+			renderItem={renderPost}
+			keyExtractor={(item) => item.id}
 			style={styles.container}
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-		>
-			<Text style={styles.header}>Feed</Text>
-			{posts.length === 0 && (
-				<Text style={styles.empty}>No posts yet.</Text>
-			)}
-			{posts.map(post => (
-				<PostCard
-					key={post.id}
-					user={user}
-					post={post}
-					userMap={userMap}
-					renderComments={renderComments}
-					likes={likes}
-					comments={comments}
-					handleLike={handleLike}
-					handleAddComment={handleAddComment}
-					commentInputs={commentInputs}
-					setCommentInputs={setCommentInputs}
-					replyingTo={replyingTo}
-					setReplyingTo={setReplyingTo}
-				/>
-			))}
-		</ScrollView>
+			onEndReached={loadMore}
+			onEndReachedThreshold={0.1}
+			ListHeaderComponent={renderHeader}
+			ListFooterComponent={renderFooter}
+		/>
 	);
 };
 
@@ -475,5 +529,9 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 		alignItems: 'center',
 		backgroundColor: '#fff',
+	},
+	loadingMore: {
+		padding: 20,
+		alignItems: 'center',
 	},
 });
