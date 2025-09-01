@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import PostCarousel from './PostCarousel';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { Post, Like, Comment } from '../types/Post';
 
 interface PostCardProps {
@@ -33,13 +34,25 @@ const PostCard: React.FC<PostCardProps> = ({
 	replyingTo,
 	setReplyingTo,
 }) => {
+
+   const videoPlayer = post.media_type === 'video' && post.media_urls?.[0]
+		? useVideoPlayer(post.media_urls[0], (p: any) => { if (p) p.loop = true; })
+		: null;
+
 	return (
 		<View style={styles.card}>
 			<View style={styles.cardHeader}>
 				<Image source={{ uri: 'https://i.pravatar.cc/40?u=' + post.user_id }} style={styles.avatar} />
 				<Text style={styles.username}>{userMap[post.user_id]?.username || post.user_id}</Text>
 			</View>
-			{post.media_urls && post.media_urls.length > 0 ? (
+			{post.media_type === 'video' && post.media_urls && post.media_urls.length > 0 && videoPlayer ? (
+				<VideoView
+					player={videoPlayer}
+					style={{ width: '100%', height: 320, borderRadius: 8, marginBottom: 8, backgroundColor: '#000' }}
+					allowsFullscreen
+					allowsPictureInPicture
+				/>
+			) : post.media_type === 'image' && post.media_urls && post.media_urls.length > 0 ? (
 				<PostCarousel images={post.media_urls} />
 			) : null}
 			<View style={styles.actionsRow}>
