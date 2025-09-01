@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
@@ -20,6 +20,7 @@ const replaceComment = usePostStore(state => state.replaceComment);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [hasMore, setHasMore] = useState(true);
 	const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
+	const [visibleItems, setVisibleItems] = useState<Set<string>>(new Set());
 
 	const [replyingTo, setReplyingTo] = useState<{ [postId: string]: string | null }>({});
 
@@ -216,11 +217,25 @@ const replaceComment = usePostStore(state => state.replaceComment);
 		}
 	};
 
+	const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+		const visiblePostIds = new Set<string>(
+			viewableItems
+				.filter((item: any) => item.item.media_type === 'video')
+				.map((item: any) => item.item.id as string)
+		);
+		setVisibleItems(visiblePostIds);
+	}, []);
+
+	const viewabilityConfig = {
+		itemVisiblePercentThreshold: 50, // 50% of the item must be visible
+	};
+
 	const renderPost = ({ item }: { item: Post }) => (
 		<PostCard
 			key={item.id}
 			user={user}
 			post={item}
+			isVisible={visibleItems.has(item.id)}
 			userMap={userMap}
 			renderComments={renderComments}
 			likes={likes}
@@ -387,6 +402,8 @@ const handleLike = async (postId: string) => {
 			refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
 			onEndReached={loadMore}
 			onEndReachedThreshold={0.1}
+			onViewableItemsChanged={onViewableItemsChanged}
+			viewabilityConfig={viewabilityConfig}
 			ListHeaderComponent={renderHeader}
 			ListFooterComponent={renderFooter}
 		/>

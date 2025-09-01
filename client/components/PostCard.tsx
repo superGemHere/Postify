@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import PostCarousel from './PostCarousel';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -8,6 +8,7 @@ import { Post, Like, Comment } from '../types/Post';
 interface PostCardProps {
 	user: any;
 	post: Post;
+	isVisible?: boolean;
 	userMap: { [id: string]: { username: string; email: string } };
 	renderComments: (commentsArr: Comment[], postId: string) => React.ReactNode;
 	likes: { [postId: string]: Like[] };
@@ -23,6 +24,7 @@ interface PostCardProps {
 const PostCard: React.FC<PostCardProps> = ({
 	user,
 	post,
+	isVisible = false,
 	userMap,
 	renderComments,
 	likes,
@@ -36,8 +38,26 @@ const PostCard: React.FC<PostCardProps> = ({
 }) => {
 
    const videoPlayer = post.media_type === 'video' && post.media_urls?.[0]
-		? useVideoPlayer(post.media_urls[0], (p: any) => { if (p) p.loop = true; })
+		? useVideoPlayer(post.media_urls[0], (p: any) => { 
+			if (p) {
+				p.loop = true;
+				p.muted = false; // Allow sound by default
+			}
+		})
 		: null;
+
+	// Autoplay logic
+	useEffect(() => {
+		if (videoPlayer) {
+			if (isVisible) {
+				if (videoPlayer.status === 'idle' || videoPlayer.status === 'readyToPlay') {
+					videoPlayer.play();
+				}
+			} else {
+				videoPlayer.pause();
+			}
+		}
+	}, [isVisible, videoPlayer]);
 
 	return (
 		<View style={styles.card}>
@@ -51,6 +71,7 @@ const PostCard: React.FC<PostCardProps> = ({
 					style={{ width: '100%', height: 320, borderRadius: 8, marginBottom: 8, backgroundColor: '#000' }}
 					allowsFullscreen
 					allowsPictureInPicture
+					nativeControls={true}
 				/>
 			) : post.media_type === 'image' && post.media_urls && post.media_urls.length > 0 ? (
 				<PostCarousel images={post.media_urls} />
