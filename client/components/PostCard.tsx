@@ -56,7 +56,7 @@ const PostCard: React.FC<PostCardProps> = ({
 				<PostCarousel images={post.media_urls} />
 			) : null}
 			<View style={styles.actionsRow}>
-				<TouchableOpacity onPress={() => handleLike(post.id)}>
+				<TouchableOpacity onPressIn={() => handleLike(post.id)}>
 					<Text style={styles.likeBtn}>
 						{user && likes[post.id]?.some(like => like.user_id === user.id) ? '❤️' : '🤍'}
 					</Text>
@@ -76,7 +76,7 @@ const PostCard: React.FC<PostCardProps> = ({
 							value={commentInputs[post.id] || ''}
 							onChangeText={text => setCommentInputs(inputs => ({ ...inputs, [post.id]: text }))}
 						/>
-						<TouchableOpacity onPress={() => handleAddComment(post.id)}>
+						<TouchableOpacity onPressIn={() => handleAddComment(post.id)}>
 							<Text style={styles.postCommentBtn}>Post</Text>
 						</TouchableOpacity>
 					</View>
