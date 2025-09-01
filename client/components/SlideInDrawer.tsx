@@ -1,5 +1,5 @@
 import React, { ReactNode, useRef, useEffect, useState } from 'react';
-import { Animated, Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, StyleSheet, TouchableOpacity, View, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface SlideInDrawerProps {
@@ -8,8 +8,10 @@ interface SlideInDrawerProps {
   width?: number;
   children: ReactNode;
 }
-const height = Dimensions.get('window').height;
-export const SlideInDrawer = ({ visible, onClose, width = 220, children }: SlideInDrawerProps) => {
+
+const { height: screenHeight } = Dimensions.get('window');
+
+export const SlideInDrawer = ({ visible, onClose, width = 230, children }: SlideInDrawerProps) => {
   const insets = useSafeAreaInsets();
   const translateX = useRef(new Animated.Value(width)).current;
   const [shouldRender, setShouldRender] = useState(visible);
@@ -36,43 +38,60 @@ export const SlideInDrawer = ({ visible, onClose, width = 220, children }: Slide
   if (!shouldRender) return null;
 
   return (
-    <View
-      style={[
-        StyleSheet.absoluteFill,
-        { top: insets.top, height: height - insets.top },
-      ]}
-      pointerEvents="box-none"
+    <Modal
+      transparent
+      visible={visible}
+      onRequestClose={onClose}
+      animationType="none"
     >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      />
-      <Animated.View
-        style={[
-          styles.drawer,
-          { width, transform: [{ translateX }], height: height - insets.top },
-        ]}
-      >
-        {children}
-      </Animated.View>
-    </View>
+      <View style={styles.modalContainer}>
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <Animated.View
+          style={[
+            styles.drawer,
+            { 
+              width, 
+              transform: [{ translateX }], 
+              height: screenHeight,
+              paddingTop: insets.top + 24,
+              paddingBottom: insets.bottom + 50,
+            },
+          ]}
+          pointerEvents="auto"
+        >
+          {children}
+        </Animated.View>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    paddingTop: 0,
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    height: height,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', 
   },
   drawer: {
     position: 'absolute',
     right: 0,
+    top: 0,
     backgroundColor: '#fff',
-    paddingTop: 24,
-    paddingHorizontal: 20,
-
-   borderLeftWidth: .5,
-   borderLeftColor: '#e6e5e5',
+    paddingHorizontal: 25,
+    justifyContent: 'space-between',
+    borderLeftWidth: 0.5,
+    borderLeftColor: '#e6e5e5',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
 });
