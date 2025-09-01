@@ -260,7 +260,6 @@ const replaceComment = usePostStore(state => state.replaceComment);
 
 	const renderHeader = () => (
 		<View>
-			<Text style={styles.header}>Feed</Text>
 			{posts.length === 0 && (
 				<Text style={styles.empty}>No posts yet.</Text>
 			)}
