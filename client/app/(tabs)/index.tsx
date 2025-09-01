@@ -1,33 +1,11 @@
 
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
-
-interface Post {
-	id: string;
-	user_id: string;
-	media_url: string;
-	media_type: string;
-	caption: string;
-	created_at: string;
-}
-interface Like {
-	id: string;
-	post_id: string;
-	user_id: string;
-	created_at: string;
-}
-interface Comment {
-	id: string;
-	post_id: string;
-	user_id: string;
-	content: string;
-	created_at: string;
-	parent_id?: string | null;
-	replies?: Comment[];
-}
+import PostCard from '@/components/PostCard';
+import { Post, Like, Comment } from '@/types/Post';
 
 export default function FeedScreen() {
 	const [posts, setPosts] = useState<Post[]>([]);
@@ -36,6 +14,8 @@ export default function FeedScreen() {
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
+
+	const [replyingTo, setReplyingTo] = useState<{ [postId: string]: string | null }>({});
 
 	const user = useAuthStore(state => state.user);
 	const [userMap, setUserMap] = useState<{ [id: string]: { username: string; email: string } }>({});
@@ -65,9 +45,18 @@ export default function FeedScreen() {
 			.select('*')
 			.order('created_at', { ascending: false });
 		if (!error && data) {
-			setPosts(data as Post[]);
+			// Ensure media_urls is always an array
+			const postsWithArray = (data as any[]).map(post => ({
+				...post,
+				media_urls: Array.isArray(post.media_urls)
+					? post.media_urls
+					: post.media_url
+						? [post.media_url]
+						: [],
+			}));
+			setPosts(postsWithArray as Post[]);
 			// Fetch userMap for post authors
-			const postUserIds = (data as Post[]).map(p => p.user_id);
+			const postUserIds = postsWithArray.map(p => p.user_id);
 			fetchUserMap(postUserIds);
 		}
 		setLoading(false);
@@ -128,7 +117,6 @@ export default function FeedScreen() {
 		setRefreshing(false);
 	};
 
-	// ...existing code...
 
 
 		const handleLike = async (postId: string) => {
@@ -149,31 +137,74 @@ export default function FeedScreen() {
 			if (!error) fetchLikes(postId);
 		};
 
-		const handleAddComment = async (postId: string, parentId?: string) => {
+		const handleAddComment = async (postId: string) => {
 			if (!user) return;
 			const user_id = user.id;
 			const content = commentInputs[postId]?.trim();
 			if (!content) return;
+
+			const parent_id = replyingTo[postId] || null;
 			const { error } = await supabase.from('comments').insert([
-				{ post_id: postId, user_id, content, parent_id: parentId || null },
+				{ post_id: postId, user_id, content, parent_id },
 			]);
 			if (!error) {
 				fetchComments(postId);
 				setCommentInputs(inputs => ({ ...inputs, [postId]: '' }));
+				setReplyingTo(inputs => ({ ...inputs, [postId]: null }));
 			}
 		};
 
-	const renderComments = (commentsArr: Comment[], postId: string, level = 0) => {
+	const renderComments = (commentsArr: Comment[], postId: string) => {
 		return commentsArr.map(comment => {
 			const displayName = userMap[comment.user_id]?.username || comment.user_id;
+			const isReplying = replyingTo[postId] === comment.id;
 			return (
-				<View key={comment.id} style={[styles.comment, { marginLeft: level * 20 }]}> 
-					<Text style={styles.commentUser}>{displayName}</Text>
-					<Text style={styles.commentContent}>{comment.content}</Text>
-					<TouchableOpacity style={styles.replyBtn} onPress={() => setCommentInputs(inputs => ({ ...inputs, [postId]: `@${displayName} ` }))}>
-						<Text style={styles.replyText}>Reply</Text>
-					</TouchableOpacity>
-					{comment.replies && comment.replies.length > 0 && renderComments(comment.replies, postId, level + 1)}
+				<View key={comment.id} style={{ marginBottom: 4 }}>
+					<View style={styles.comment}>
+						<Text style={styles.commentUser}>{displayName}</Text>
+						<Text style={styles.commentContent}>{comment.content}</Text>
+						<TouchableOpacity
+							style={styles.replyBtn}
+							onPress={() => {
+								setReplyingTo(inputs => ({ ...inputs, [postId]: comment.id }));
+								setCommentInputs(inputs => ({ ...inputs, [postId]: `@${displayName} ` }));
+							}}
+						>
+							<Text style={styles.replyText}>Reply</Text>
+						</TouchableOpacity>
+					</View>
+
+					{isReplying && (
+						<View style={[styles.addCommentRow, { marginLeft: 20, marginBottom: 4 }]}> 
+							<TextInput
+								style={styles.commentInput}
+								placeholder={`Reply to @${displayName}...`}
+								value={commentInputs[postId] || ''}
+								onChangeText={text => setCommentInputs(inputs => ({ ...inputs, [postId]: text }))}
+								autoFocus
+							/>
+							<TouchableOpacity onPress={() => handleAddComment(postId)}>
+								<Text style={styles.postCommentBtn}>Post</Text>
+							</TouchableOpacity>
+							<TouchableOpacity onPress={() => setReplyingTo(inputs => ({ ...inputs, [postId]: null }))}>
+								<Text style={{ color: '#888', marginLeft: 4 }}>Cancel</Text>
+							</TouchableOpacity>
+						</View>
+					)}
+
+					{comment.replies && comment.replies.length > 0 && (
+						<View style={styles.repliesContainer}>
+							{comment.replies.map((reply, idx) => {
+								const replyName = userMap[reply.user_id]?.username || reply.user_id;
+								return (
+									<View key={reply.id || `${comment.id}-reply-${idx}`} style={[styles.comment, styles.replyItem]}>
+										<Text style={styles.commentUser}>{replyName}</Text>
+										<Text style={styles.commentContent}>{reply.content}</Text>
+									</View>
+								);
+							})}
+						</View>
+					)}
 				</View>
 			);
 		});
@@ -197,45 +228,39 @@ export default function FeedScreen() {
 				<Text style={styles.empty}>No posts yet.</Text>
 			)}
 			{posts.map(post => (
-				<View key={post.id} style={styles.card}>
-					<View style={styles.cardHeader}>
-						<Image source={{ uri: 'https://i.pravatar.cc/40?u=' + post.user_id }} style={styles.avatar} />
-						<Text style={styles.username}>{userMap[post.user_id]?.username || post.user_id}</Text>
-					</View>
-					{post.media_url ? (
-						<Image source={{ uri: post.media_url }} style={styles.image} resizeMode="cover" />
-					) : null}
-					<View style={styles.actionsRow}>
-						<TouchableOpacity onPress={() => handleLike(post.id)}>
-							<Text style={styles.likeBtn}>
-								{user && likes[post.id]?.some(like => like.user_id === user.id) ? '❤️' : '🤍'}
-							</Text>
-						</TouchableOpacity>
-						<Text style={styles.likesCount}>{likes[post.id]?.length || 0} likes</Text>
-					</View>
-					  <Text style={styles.caption}><Text style={styles.username}>{userMap[post.user_id]?.username || post.user_id}</Text> {post.caption}</Text>
-					<Text style={styles.meta}>{new Date(post.created_at).toLocaleString()}</Text>
-					<View style={styles.commentsSection}>
-						{comments[post.id] && renderComments(comments[post.id], post.id)}
-						<View style={styles.addCommentRow}>
-							<TextInput
-								style={styles.commentInput}
-								placeholder="Add a comment..."
-								value={commentInputs[post.id] || ''}
-								onChangeText={text => setCommentInputs(inputs => ({ ...inputs, [post.id]: text }))}
-							/>
-							<TouchableOpacity onPress={() => handleAddComment(post.id)}>
-								<Text style={styles.postCommentBtn}>Post</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-				</View>
+				<PostCard
+					key={post.id}
+					user={user}
+					post={post}
+					userMap={userMap}
+					renderComments={renderComments}
+					likes={likes}
+					comments={comments}
+					handleLike={handleLike}
+					handleAddComment={handleAddComment}
+					commentInputs={commentInputs}
+					setCommentInputs={setCommentInputs}
+					replyingTo={replyingTo}
+					setReplyingTo={setReplyingTo}
+				/>
 			))}
 		</ScrollView>
 	);
 };
 
 const styles = StyleSheet.create({
+	repliesContainer: {
+		marginLeft: 20,
+		marginTop: 2,
+		marginBottom: 2,
+		gap: 2,
+	},
+	replyItem: {
+		backgroundColor: '#f5f5f5',
+		borderRadius: 8,
+		paddingHorizontal: 6,
+		paddingVertical: 2,
+	},
 	container: {
 		flex: 1,
 		backgroundColor: '#fff',
@@ -272,13 +297,6 @@ const styles = StyleSheet.create({
 		fontWeight: 'bold',
 		fontSize: 15,
 		color: '#222',
-	},
-	image: {
-		width: '100%',
-		height: 320,
-		borderRadius: 8,
-		marginBottom: 8,
-		backgroundColor: '#ddd',
 	},
 	actionsRow: {
 		flexDirection: 'row',
