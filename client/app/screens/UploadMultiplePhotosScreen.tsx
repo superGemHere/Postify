@@ -21,7 +21,7 @@ export default function UploadMultiplePhotosScreen() {
       // Try multiple selection if supported
       try {
         result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: 'images',
           allowsEditing: false,
           allowsMultipleSelection: true,
           quality: 0.8,
