@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
-import { usePostStore } from '../../store/postStore';
+import { usePostStore, Post, Like, Comment } from '../../store/postStore';
 import PostCard from '@/components/PostCard';
-import { Post, Like, Comment } from '@/types/Post';
 
 export default function FeedScreen() {
-	const [posts, setPosts] = useState<Post[]>([]);
+	const posts = usePostStore(state => state.posts);
+	const setPosts = usePostStore(state => state.setPosts);
 	const likes = usePostStore(state => state.likes);
 	const addLikeOrToggle = usePostStore(state => state.addLikeOrToggle);
 	const comments = usePostStore(state => state.comments);
@@ -71,7 +71,7 @@ const replaceComment = usePostStore(state => state.replaceComment);
 			}));
 			
 			if (isLoadMore) {
-				setPosts(prev => [...prev, ...postsWithArray]);
+				setPosts([...posts, ...postsWithArray]);
 			} else {
 				setPosts(postsWithArray as Post[]);
 			}

@@ -5,11 +5,18 @@ import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { supabase } from '../../lib/supabase';
+import { usePostStore } from '../../store/postStore';
+import { useAuthStore } from '../../store/authStore';
 
 export default function UploadVideoScreen() {
   const [video, setVideo] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const [uploading, setUploading] = useState(false);
+  
+  const addPost = usePostStore(state => state.addPost);
+  const removePost = usePostStore(state => state.removePost);
+  const replacePost = usePostStore(state => state.replacePost);
+  const user = useAuthStore(state => state.user);
   const player = useVideoPlayer(video || '', (p: any) => { if (p && video) p.loop = true; });
 
   const pickVideo = async () => {
@@ -29,15 +36,24 @@ export default function UploadVideoScreen() {
   };
 
   const uploadVideo = async () => {
-    if (!video) return;
+    if (!video || !user) return;
     setUploading(true);
+    
+    // Create temporary post for optimistic update
+    const tempId = Math.random().toString(36).slice(2);
+    const tempPost = {
+      id: tempId,
+      user_id: user.id,
+      media_urls: [video], // Use local video URI temporarily
+      media_type: 'video',
+      caption,
+      created_at: new Date().toISOString(),
+    };
+    
+    // Add to store immediately for instant UI update
+    addPost(tempPost);
+    
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (!user) {
-        Alert.alert('Not logged in', 'Please log in before uploading.');
-        setUploading(false);
-        return;
-      }
       const fileExt = video.split('.').pop();
       const fileName = `${user.id}/video-${Date.now()}.${fileExt}`;
       const contentType = `video/${fileExt}`;
@@ -49,21 +65,36 @@ export default function UploadVideoScreen() {
       if (storageError) throw storageError;
       const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(fileName);
       const videoUrl = publicUrlData.publicUrl;
-      
-      const { error: dbError } = await supabase.from('posts').insert([
+
+      const { data: dbData, error: dbError } = await supabase.from('posts').insert([
         {
           user_id: user.id,
           media_urls: [videoUrl],
           media_type: 'video',
           caption,
         },
-      ]);
+      ]).select();
+      
       if (dbError) throw dbError;
+      
+      if (dbData && dbData.length > 0) {
+        // Replace temporary post with real one
+        const realPost = {
+          ...dbData[0],
+          media_urls: Array.isArray(dbData[0].media_urls) 
+            ? dbData[0].media_urls 
+            : [dbData[0].media_urls],
+        };
+        replacePost(tempId, realPost);
+      }
+      
       Alert.alert('Success', 'Video uploaded and post created!');
       setVideo(null);
       setCaption('');
     } catch (e: any) {
       Alert.alert('Upload failed', e.message);
+      // Remove the temporary post on error
+      removePost(tempId);
     } finally {
       setUploading(false);
     }

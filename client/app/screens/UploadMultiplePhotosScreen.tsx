@@ -4,11 +4,18 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../lib/supabase';
+import { usePostStore } from '../../store/postStore';
+import { useAuthStore } from '../../store/authStore';
 
 export default function UploadMultiplePhotosScreen() {
   const [images, setImages] = useState<string[]>([]);
   const [caption, setCaption] = useState('');
   const [uploading, setUploading] = useState(false);
+  
+  const addPost = usePostStore(state => state.addPost);
+  const removePost = usePostStore(state => state.removePost);
+  const replacePost = usePostStore(state => state.replacePost);
+  const user = useAuthStore(state => state.user);
 
   const pickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -49,16 +56,24 @@ export default function UploadMultiplePhotosScreen() {
   };
 
   const uploadImages = async () => {
-    if (images.length === 0) return;
+    if (images.length === 0 || !user) return;
     setUploading(true);
+    
+    // Creating temporary post for optimistic update
+    const tempId = Math.random().toString(36).slice(2);
+    const tempPost = {
+      id: tempId,
+      user_id: user.id,
+      media_urls: images, // Use local image URIs temporarily
+      media_type: 'image',
+      caption,
+      created_at: new Date().toISOString(),
+    };
+    
+    // Add to postStore for instant UI update
+    addPost(tempPost);
+    
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (!user) {
-        Alert.alert('Not logged in', 'Please log in before uploading.');
-        setUploading(false);
-        return;
-      }
-
       const urls: string[] = [];
       for (let i = 0; i < images.length; i++) {
         const image = images[i];
@@ -75,20 +90,35 @@ export default function UploadMultiplePhotosScreen() {
         urls.push(publicUrlData.publicUrl);
       }
 
-      const { error: dbError } = await supabase.from('posts').insert([
+      const { data: dbData, error: dbError } = await supabase.from('posts').insert([
         {
           user_id: user.id,
           media_urls: urls,
           media_type: 'image',
           caption,
         },
-      ]);
+      ]).select();
+      
       if (dbError) throw dbError;
+      
+      if (dbData && dbData.length > 0) {
+        // Replace temporary post with real one
+        const realPost = {
+          ...dbData[0],
+          media_urls: Array.isArray(dbData[0].media_urls) 
+            ? dbData[0].media_urls 
+            : [dbData[0].media_urls],
+        };
+        replacePost(tempId, realPost);
+      }
+      
       Alert.alert('Success', 'Images uploaded and post created!');
       setImages([]);
       setCaption('');
     } catch (e: any) {
       Alert.alert('Upload failed', e.message);
+      // Remove the temporary post on error
+      removePost(tempId);
     } finally {
       setUploading(false);
     }

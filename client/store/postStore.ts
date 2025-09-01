@@ -34,6 +34,9 @@ interface PostStoreState {
   setLikes: (postId: string, likes: Like[]) => void;
   setComments: (postId: string, comments: Comment[]) => void;
   updatePost: (post: Post) => void;
+  addPost: (post: Post) => void;
+  removePost: (postId: string) => void;
+  replacePost: (tempId: string, realPost: Post) => void;
   addLikeOrToggle: (postId: string, like: Like | undefined, userId: string) => void;
   removeLike: (postId: string, likeId: string) => void;
   addComment: (postId: string, comment: Comment) => void;
@@ -49,6 +52,17 @@ export const usePostStore = create<PostStoreState>((set, get) => ({
   setComments: (postId, commentsArr) => set(state => ({ comments: { ...state.comments, [postId]: commentsArr } })),
   updatePost: (post) => set(state => ({
     posts: state.posts.map(p => p.id === post.id ? post : p)
+  })),
+  addPost: (post) => set(state => ({
+    posts: [post, ...state.posts]
+  })),
+  removePost: (postId) => set(state => ({
+    posts: state.posts.filter(p => p.id !== postId)
+  })),
+  replacePost: (tempId, realPost) => set(state => ({
+    posts: state.posts.map(p => p.id === tempId ? realPost : p),
+    likes: { ...state.likes, [realPost.id]: state.likes[tempId] || [] },
+    comments: { ...state.comments, [realPost.id]: state.comments[tempId] || [] }
   })),
   addLikeOrToggle: (postId, like, userId) => set(state => {
     const currentLikes = state.likes[postId] || [];

@@ -4,11 +4,18 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
 import { supabase } from '../../lib/supabase';
+import { usePostStore } from '../../store/postStore';
+import { useAuthStore } from '../../store/authStore';
 
 export default function UploadSinglePhotoScreen_fs() {
 	const [image, setImage] = useState<string | null>(null);
 	const [caption, setCaption] = useState('');
 	const [uploading, setUploading] = useState(false);
+	
+	const addPost = usePostStore(state => state.addPost);
+	const removePost = usePostStore(state => state.removePost);
+	const replacePost = usePostStore(state => state.replacePost);
+	const user = useAuthStore(state => state.user);
 
 	const pickImage = async () => {
 		const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -27,16 +34,24 @@ export default function UploadSinglePhotoScreen_fs() {
 	};
 
 	const uploadImage = async () => {
-		if (!image) return;
+		if (!image || !user) return;
 		setUploading(true);
+		
+		// Create temporary post for optimistic update
+		const tempId = Math.random().toString(36).slice(2);
+		const tempPost = {
+			id: tempId,
+			user_id: user.id,
+			media_urls: [image], // Use local image URI temporarily
+			media_type: 'image',
+			caption,
+			created_at: new Date().toISOString(),
+		};
+		
+		// Add to store immediately for instant UI update
+		addPost(tempPost);
+		
 		try {
-			const { data: { user }, error: userError } = await supabase.auth.getUser();
-			if (!user) {
-				Alert.alert('Not logged in', 'Please log in before uploading.');
-				setUploading(false);
-				return;
-			}
-
 			// Read file as base64
 			const fileExt = image.split('.').pop();
 			const fileName = `${user.id}/photo-${Date.now()}.${fileExt}`;
@@ -54,21 +69,36 @@ export default function UploadSinglePhotoScreen_fs() {
 			const { data: publicUrlData } = supabase.storage.from('photos').getPublicUrl(fileName);
 			const mediaUrl = publicUrlData.publicUrl;
 
-			// Insert post into DB
-			const { error: dbError } = await supabase.from('posts').insert([
+			// Insert post into DB and get real post data
+			const { data: dbData, error: dbError } = await supabase.from('posts').insert([
 				{
 					user_id: user.id,
 					media_urls: [mediaUrl],
 					media_type: 'image',
 					caption,
 				},
-			]);
+			]).select();
+			
 			if (dbError) throw dbError;
+			
+			if (dbData && dbData.length > 0) {
+				// Replace temporary post with real one
+				const realPost = {
+					...dbData[0],
+					media_urls: Array.isArray(dbData[0].media_urls) 
+						? dbData[0].media_urls 
+						: [dbData[0].media_urls],
+				};
+				replacePost(tempId, realPost);
+			}
+			
 			Alert.alert('Success', 'Image uploaded and post created!');
 			setImage(null);
 			setCaption('');
 		} catch (e: any) {
 			Alert.alert('Upload failed', e.message);
+			// Remove the temporary post on error
+			removePost(tempId);
 		} finally {
 			setUploading(false);
 		}
