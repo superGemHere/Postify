@@ -58,7 +58,7 @@ export default function UploadSinglePhotoScreen_fs() {
 			const { error: dbError } = await supabase.from('posts').insert([
 				{
 					user_id: user.id,
-					media_url: mediaUrl,
+					media_urls: [mediaUrl],
 					media_type: 'image',
 					caption,
 				},
@@ -76,8 +76,8 @@ export default function UploadSinglePhotoScreen_fs() {
 
 	return (
 		<View style={styles.container}>
-			<Text style={styles.title}>Upload Single Photo</Text>
-			<TouchableOpacity onPress={pickImage} style={styles.button}>
+			<Text style={styles.title}>Upload Single Photo FSS</Text>
+			<TouchableOpacity onPressIn={pickImage} style={styles.button}>
 				<Text style={styles.buttonText}>Pick an image</Text>
 			</TouchableOpacity>
 			{image && (
@@ -89,7 +89,7 @@ export default function UploadSinglePhotoScreen_fs() {
 				value={caption}
 				onChangeText={setCaption}
 			/>
-			<TouchableOpacity onPress={uploadImage} disabled={!image || uploading} style={styles.button}>
+			<TouchableOpacity onPressIn={uploadImage} disabled={!image || uploading} style={styles.button}>
 				<Text style={styles.buttonText}>{uploading ? 'Uploading...' : 'Upload'}</Text>
 			</TouchableOpacity>
 		</View>
