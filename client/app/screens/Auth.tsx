@@ -11,9 +11,14 @@ export default function AuthScreen() {
   const { login, register, loading, error } = useAuthStore();
   const [isRegister, setIsRegister] = useState<boolean>(false);
 
+  const [info, setInfo] = useState<string>('');
+
   const handleSubmit = async () => {
     if (isRegister) {
-      await register(email, password, name);
+      const result = await register(email, password, name);
+      // After registration, show info and redirect to login
+      setInfo('Registration successful! Please check your email to confirm your account before logging in.');
+      setIsRegister(false);
     } else {
       await login(email, password);
     }
@@ -56,7 +61,8 @@ export default function AuthScreen() {
           onChangeText={setPassword}
           secureTextEntry
         />
-        {error && <Text style={styles.error}>{error}</Text>}
+  {error && <Text style={styles.error}>{error}</Text>}
+  {info && <Text style={styles.info}>{info}</Text>}
         <AuthButton
           title={isRegister ? 'Register' : 'Login'}
           onPress={handleSubmit}
@@ -99,5 +105,11 @@ const styles = StyleSheet.create({
     color: 'red',
     marginBottom: 12,
     textAlign: 'center',
+  },
+  info: {
+    color: 'green',
+    marginBottom: 12,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });

@@ -74,8 +74,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         username: name,
       });
       set({
-        user: { id: data.user.id, email: data.user.email ?? '', name },
-        token: data.session?.access_token ?? null,
+        user: null,
+        token: null,
         loading: false,
         error: null,
       });
