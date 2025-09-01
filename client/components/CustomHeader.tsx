@@ -18,62 +18,54 @@ const CustomHeader = (): JSX.Element => {
         <Ionicons name="menu" size={28} color="#222" />
       </TouchableOpacity>
       <SlideInDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)}>
-        <Text style={styles.drawerTitle}>Menu</Text>
+        <View>
+          <Text style={styles.drawerTitle}>Menu</Text>
+          <TouchableOpacity
+            style={styles.drawerItem}
+            onPress={() => {
+              setDrawerVisible(false)
+              router.push('/screens/UploadSinglePhotoScreen_fs')
+            }}
+          >
+            <Ionicons name="image-outline" size={22} color="#222" style={{ marginRight: 8 }} />
+            <Text style={styles.drawerItemText}>Upload Single Photo FS</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.drawerItem}
+            onPress={() => {
+              setDrawerVisible(false)
+              router.push('/screens/UploadMultiplePhotosScreen')
+            }}
+          >
+            <Ionicons name="images-outline" size={22} color="#222" style={{ marginRight: 8 }} />
+            <Text style={styles.drawerItemText}>Upload Multiple Photos</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.drawerItem}
+            onPress={() => {
+              setDrawerVisible(false)
+              router.push('/screens/UploadVideoScreen')
+            }}
+          >
+            <Ionicons name="videocam-outline" size={22} color="#222" style={{ marginRight: 8 }} />
+            <Text style={styles.drawerItemText}>Upload Video</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
-          style={styles.drawerItem}
-          onPress={() => {
-            logout()
-            setDrawerVisible(false)
-          }}
-        >
-          <Ionicons
-            name="log-out-outline"
-            size={22}
-            color="#222"
-            style={{ marginRight: 8 }}
-          />
-          <Text style={styles.drawerItemText}>Logout</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.drawerItem}
-          onPress={() => {
-            setDrawerVisible(false)
-            router.push('/screens/UploadSinglePhotoScreen')
-          }}
-        >
-          <Ionicons name="image-outline" size={22} color="#222" style={{ marginRight: 8 }} />
-          <Text style={styles.drawerItemText}>Upload Single Photo</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.drawerItem}
-          onPress={() => {
-            setDrawerVisible(false)
-            router.push('/screens/UploadSinglePhotoScreen_fs')
-          }}
-        >
-          <Ionicons name="image-outline" size={22} color="#222" style={{ marginRight: 8 }} />
-          <Text style={styles.drawerItemText}>Upload Single Photo FS</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.drawerItem}
-          onPress={() => {
-            setDrawerVisible(false)
-            router.push('/screens/UploadMultiplePhotosScreen')
-          }}
-        >
-          <Ionicons name="images-outline" size={22} color="#222" style={{ marginRight: 8 }} />
-          <Text style={styles.drawerItemText}>Upload Multiple Photos</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.drawerItem}
-          onPress={() => {
-            setDrawerVisible(false)
-            router.push('/screens/UploadVideoScreen')
-          }}
-        >
-          <Ionicons name="videocam-outline" size={22} color="#222" style={{ marginRight: 8 }} />
-          <Text style={styles.drawerItemText}>Upload Video</Text>
-        </TouchableOpacity>
+        style={[styles.drawerItem, { borderTopWidth: 1, borderBottomColor: '#eee' }]}
+        onPress={() => {
+          logout()
+          setDrawerVisible(false)
+        }}
+      >
+        <Ionicons
+          name="log-out-outline"
+          size={22}
+          color="#222"
+          style={{ marginRight: 8 }}
+        />
+        <Text style={styles.drawerItemText}>Logout</Text>
+      </TouchableOpacity>
       </SlideInDrawer>
     </View>
   )
