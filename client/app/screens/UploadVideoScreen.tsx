@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView } from 'react-native';
+import { Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
@@ -101,45 +102,51 @@ export default function UploadVideoScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
       >
-        <Text style={styles.title}>Upload Video</Text>
-        <TouchableOpacity onPressIn={pickVideo} style={styles.button}>
-          <Text style={styles.buttonText}>Pick a video</Text>
-        </TouchableOpacity>
-        {video && player && (
-          <VideoView
-            player={player}
-            style={styles.video}
-            allowsFullscreen
-            allowsPictureInPicture
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.title}>Upload Video</Text>
+          <TouchableOpacity onPressIn={pickVideo} style={styles.button}>
+            <Text style={styles.buttonText}>Pick a video</Text>
+          </TouchableOpacity>
+          {video && player && (
+            <VideoView
+              player={player}
+              style={styles.video}
+              allowsFullscreen
+              allowsPictureInPicture
+            />
+          )}
+          <TextInput
+            style={styles.input}
+            placeholder="Add a caption..."
+            value={caption}
+            onChangeText={setCaption}
+            multiline
+            numberOfLines={3}
           />
-        )}
-        <TextInput
-          style={styles.input}
-          placeholder="Add a caption..."
-          value={caption}
-          onChangeText={setCaption}
-          multiline
-          numberOfLines={3}
-        />
-        <TouchableOpacity onPressIn={uploadVideo} disabled={!video || uploading} style={styles.button}>
-          {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Upload</Text>}
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <TouchableOpacity onPressIn={uploadVideo} disabled={!video || uploading} style={styles.button}>
+            {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Upload</Text>}
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+		flex: 1,
+		backgroundColor: '#fff',
+	},
   container: {
     flex: 1,
     backgroundColor: '#fff',

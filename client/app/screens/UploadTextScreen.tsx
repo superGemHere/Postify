@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { usePostStore } from '../../store/postStore';
 import { useAuthStore } from '../../store/authStore';
@@ -68,16 +69,17 @@ export default function UploadTextScreen() {
 	const maxChars = 280; //Added twitters character limit, just for fun xD
 
 	return (
-		<KeyboardAvoidingView 
-			style={styles.container} 
-			behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-			keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
-		>
-			<ScrollView 
-				contentContainerStyle={styles.scrollContent}
-				showsVerticalScrollIndicator={false}
-				keyboardShouldPersistTaps="handled"
+		<SafeAreaView style={styles.safeArea}>
+			<KeyboardAvoidingView 
+				style={styles.container} 
+				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
 			>
+				<ScrollView 
+					contentContainerStyle={styles.scrollContent}
+					showsVerticalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
+				>
 				<Text style={styles.title}>What's on your mind?</Text>
 				
 				<View style={styles.textContainer}>
@@ -119,10 +121,15 @@ export default function UploadTextScreen() {
 				</TouchableOpacity>
 			</ScrollView>
 		</KeyboardAvoidingView>
+		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
+	safeArea: {
+		flex: 1,
+		backgroundColor: '#fff',
+	},
 	container: {
 		flex: 1,
 		backgroundColor: '#fff',

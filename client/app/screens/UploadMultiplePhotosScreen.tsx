@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Alert, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
@@ -125,45 +126,51 @@ export default function UploadMultiplePhotosScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
       >
-        <Text style={styles.title}>Upload Multiple Photos</Text>
-        <TouchableOpacity onPressIn={pickImages} style={styles.button}>
-          <Text style={styles.buttonText}>Pick images</Text>
-        </TouchableOpacity>
-        {images.length === 0 && (
-          <Text style={{ color: '#888', marginBottom: 8 }}>No images selected</Text>
-        )}
-        <View style={styles.imagesRow}>
-          {images.map((img, idx) => (
-            <Image key={idx} source={{ uri: img }} style={styles.image} />
-          ))}
-        </View>
-        <TextInput
-          style={styles.input}
-          placeholder="Add a caption..."
-          value={caption}
-          onChangeText={setCaption}
-          multiline
-          numberOfLines={3}
-        />
-        <TouchableOpacity onPressIn={uploadImages} disabled={images.length === 0 || uploading} style={styles.button}>
-          <Text style={styles.buttonText}>{uploading ? 'Uploading...' : 'Upload'}</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.title}>Upload Multiple Photos</Text>
+          <TouchableOpacity onPressIn={pickImages} style={styles.button}>
+            <Text style={styles.buttonText}>Pick images</Text>
+          </TouchableOpacity>
+          {images.length === 0 && (
+            <Text style={{ color: '#888', marginBottom: 8 }}>No images selected</Text>
+          )}
+          <View style={styles.imagesRow}>
+            {images.map((img, idx) => (
+              <Image key={idx} source={{ uri: img }} style={styles.image} />
+            ))}
+          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Add a caption..."
+            value={caption}
+            onChangeText={setCaption}
+            multiline
+            numberOfLines={3}
+          />
+          <TouchableOpacity onPressIn={uploadImages} disabled={images.length === 0 || uploading} style={styles.button}>
+            <Text style={styles.buttonText}>{uploading ? 'Uploading...' : 'Upload'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+		flex: 1,
+		backgroundColor: '#fff',
+	},
   container: {
     flex: 1,
     backgroundColor: '#fff',

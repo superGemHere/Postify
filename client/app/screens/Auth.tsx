@@ -3,6 +3,7 @@ import { View, TextInput, StyleSheet, Text, KeyboardAvoidingView, Platform } fro
 import { AuthButton } from '@/components/AuthButton';
 import { useAuthStore } from '../../store/authStore';
 import { GradientTitle } from '@/components/GradientTitle';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AuthScreen() {
   const [email, setEmail] = useState<string>('');
@@ -25,11 +26,12 @@ export default function AuthScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
-    >
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+      >
       <View style={styles.container}>
         <GradientTitle 
           text="Postify" 
@@ -61,26 +63,31 @@ export default function AuthScreen() {
           onChangeText={setPassword}
           secureTextEntry
         />
-  {error && <Text style={styles.error}>{error}</Text>}
-  {info && <Text style={styles.info}>{info}</Text>}
-        <AuthButton
-          title={isRegister ? 'Register' : 'Login'}
-          onPress={handleSubmit}
-          loading={loading}
-        />
-        <Text style={{ textAlign: 'center', marginVertical: 12, fontWeight: '500' }}>OR</Text>
-        <AuthButton
-          title={isRegister ? 'Go to Login ' : "Go to Register"}
-          onPress={() => setIsRegister((prev) => !prev)}
-          containerStyles={{ backgroundColor: 'transparent', marginBottom: 0, borderWidth: 0, elevation: 0 }}
-          textStyles={{ color: '#808080' }}
-        />
-      </View>
-    </KeyboardAvoidingView>
+      {error && <Text style={styles.error}>{error}</Text>}
+      {info && <Text style={styles.info}>{info}</Text>}
+          <AuthButton
+            title={isRegister ? 'Register' : 'Login'}
+            onPress={handleSubmit}
+            loading={loading}
+          />
+          <Text style={{ textAlign: 'center', marginVertical: 12, fontWeight: '500' }}>OR</Text>
+          <AuthButton
+            title={isRegister ? 'Go to Login ' : "Go to Register"}
+            onPress={() => setIsRegister((prev) => !prev)}
+            containerStyles={{ backgroundColor: 'transparent', marginBottom: 0, borderWidth: 0, elevation: 0 }}
+            textStyles={{ color: '#808080' }}
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+		flex: 1,
+		backgroundColor: '#fff',
+	},
   container: {
     flex: 1,
     justifyContent: 'center',

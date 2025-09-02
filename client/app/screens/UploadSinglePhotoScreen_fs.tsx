@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Button, Image, TextInput, Alert, TouchableOpacity, Platform, ScrollView, KeyboardAvoidingView } from 'react-native';
+import { Text, StyleSheet, Image, TextInput, Alert, TouchableOpacity, Platform, ScrollView, KeyboardAvoidingView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
@@ -105,11 +106,12 @@ export default function UploadSinglePhotoScreen_fs() {
 	};
 
 	return (
-		<KeyboardAvoidingView 
-			style={styles.container} 
-			behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-			keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
-		>
+		<SafeAreaView style={styles.safeArea}>
+			<KeyboardAvoidingView 
+				style={styles.container} 
+				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+			>
 			<ScrollView 
 				contentContainerStyle={styles.scrollContent}
 				showsVerticalScrollIndicator={false}
@@ -135,10 +137,15 @@ export default function UploadSinglePhotoScreen_fs() {
 				</TouchableOpacity>
 			</ScrollView>
 		</KeyboardAvoidingView>
+		</SafeAreaView>
 	);
 }
 
 const styles = StyleSheet.create({
+	safeArea: {
+		flex: 1,
+		backgroundColor: '#fff',
+	},
 	container: {
 		flex: 1,
 		backgroundColor: '#fff',
