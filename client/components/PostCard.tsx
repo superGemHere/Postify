@@ -4,12 +4,13 @@ import { View, Text, Image, TouchableOpacity, TextInput, StyleSheet } from 'reac
 import PostCarousel from './PostCarousel';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Post, Like, Comment } from '../types/Post';
+import { IconSymbol } from './ui/IconSymbol';
 
 interface PostCardProps {
 	user: any;
 	post: Post;
 	isVisible?: boolean;
-	userMap: { [id: string]: { username: string; email: string } };
+	userMap: { [id: string]: { username: string; email: string; avatar_url?: string } };
 	renderComments: (commentsArr: Comment[], postId: string) => React.ReactNode;
 	likes: { [postId: string]: Like[] };
 	comments: { [postId: string]: Comment[] };
@@ -62,8 +63,18 @@ const PostCard: React.FC<PostCardProps> = ({
 	return (
 		<View style={styles.card}>
 			<View style={styles.cardHeader}>
-				<Image source={{ uri: 'https://i.pravatar.cc/40?u=' + post.user_id }} style={styles.avatar} />
-				<Text style={styles.username}>{userMap[post.user_id]?.username || post.user_id}</Text>
+				<View style={styles.avatarContainer}>
+					{userMap[post.user_id]?.avatar_url ? (
+						<Image source={{ uri: userMap[post.user_id].avatar_url }} style={styles.avatar} />
+					) : (
+						<View style={[styles.avatar, styles.avatarPlaceholder]}>
+							<IconSymbol name="person.fill" size={20} color="#999" />
+						</View>
+					)}
+				</View>
+				<Text style={styles.username}>
+					{userMap[post.user_id]?.username || 'Loading...'}
+				</Text>
 			</View>
 			{post.media_type === 'video' && post.media_urls && post.media_urls.length > 0 && videoPlayer ? (
 				<VideoView
@@ -90,7 +101,9 @@ const PostCard: React.FC<PostCardProps> = ({
 			</View>
 			{post.media_type !== 'text' && (
 				<Text style={styles.caption}>
-					<Text style={styles.username}>{userMap[post.user_id]?.username || post.user_id}</Text> {post.caption}
+					<Text style={styles.username}>
+						{userMap[post.user_id]?.username || 'Loading...'}
+					</Text> {post.caption}
 				</Text>
 			)}
 			<Text style={styles.meta}>{new Date(post.created_at).toLocaleString()}</Text>
@@ -132,12 +145,18 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		marginBottom: 8,
 	},
+	avatarContainer: {
+		marginRight: 10,
+	},
 	avatar: {
 		width: 36,
 		height: 36,
 		borderRadius: 18,
-		marginRight: 10,
 		backgroundColor: '#eee',
+	},
+	avatarPlaceholder: {
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 	username: {
 		fontWeight: 'bold',
