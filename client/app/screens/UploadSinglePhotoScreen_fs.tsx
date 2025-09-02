@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Button, Image, TextInput, Alert, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, Button, Image, TextInput, Alert, TouchableOpacity, Platform, ScrollView, KeyboardAvoidingView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
@@ -105,33 +105,48 @@ export default function UploadSinglePhotoScreen_fs() {
 	};
 
 	return (
-		<View style={styles.container}>
-			<Text style={styles.title}>Upload Single Photo FSS</Text>
-			<TouchableOpacity onPressIn={pickImage} style={styles.button}>
-				<Text style={styles.buttonText}>Pick an image</Text>
-			</TouchableOpacity>
-			{image && (
-				<Image source={{ uri: image }} style={styles.image} />
-			)}
-			<TextInput
-				style={styles.input}
-				placeholder="Add a caption..."
-				value={caption}
-				onChangeText={setCaption}
-			/>
-			<TouchableOpacity onPressIn={uploadImage} disabled={!image || uploading} style={styles.button}>
-				<Text style={styles.buttonText}>{uploading ? 'Uploading...' : 'Upload'}</Text>
-			</TouchableOpacity>
-		</View>
+		<KeyboardAvoidingView 
+			style={styles.container} 
+			behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+			keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+		>
+			<ScrollView 
+				contentContainerStyle={styles.scrollContent}
+				showsVerticalScrollIndicator={false}
+				keyboardShouldPersistTaps="handled"
+			>
+				<Text style={styles.title}>Upload Single Photo FSS</Text>
+				<TouchableOpacity onPressIn={pickImage} style={styles.button}>
+					<Text style={styles.buttonText}>Pick an image</Text>
+				</TouchableOpacity>
+				{image && (
+					<Image source={{ uri: image }} style={styles.image} />
+				)}
+				<TextInput
+					style={styles.input}
+					placeholder="Add a caption..."
+					value={caption}
+					onChangeText={setCaption}
+					multiline
+					numberOfLines={3}
+				/>
+				<TouchableOpacity onPressIn={uploadImage} disabled={!image || uploading} style={styles.button}>
+					<Text style={styles.buttonText}>{uploading ? 'Uploading...' : 'Upload'}</Text>
+				</TouchableOpacity>
+			</ScrollView>
+		</KeyboardAvoidingView>
 	);
 }
 
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+		backgroundColor: '#fff',
+	},
+	scrollContent: {
+		flexGrow: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: '#fff',
 		padding: 20,
 		gap: 30,
 	},
@@ -153,6 +168,8 @@ const styles = StyleSheet.create({
 		padding: 10,
 		width: '100%',
 		marginBottom: 16,
+		minHeight: 80,
+		textAlignVertical: 'top',
 	},
 	button: {
 		backgroundColor: '#007bff',
@@ -160,6 +177,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 24,
 		borderRadius: 8,
 		marginVertical: 8,
+		minWidth: 120,
 	},
 	buttonText: {
 		color: '#fff',

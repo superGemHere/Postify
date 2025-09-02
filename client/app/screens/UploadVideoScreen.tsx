@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { decode } from 'base64-arraybuffer';
@@ -39,18 +39,18 @@ export default function UploadVideoScreen() {
     if (!video || !user) return;
     setUploading(true);
     
-    // Create temporary post for optimistic update
+    // Creating temporary post for optimistic update
     const tempId = Math.random().toString(36).slice(2);
     const tempPost = {
       id: tempId,
       user_id: user.id,
-      media_urls: [video], // Use local video URI temporarily
+      media_urls: [video], 
       media_type: 'video',
       caption,
       created_at: new Date().toISOString(),
     };
     
-    // Add to store immediately for instant UI update
+    // adding to postStore
     addPost(tempPost);
     
     try {
@@ -101,38 +101,53 @@ export default function UploadVideoScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Upload Video</Text>
-      <TouchableOpacity onPressIn={pickVideo} style={styles.button}>
-        <Text style={styles.buttonText}>Pick a video</Text>
-      </TouchableOpacity>
-      {video && player && (
-        <VideoView
-          player={player}
-          style={styles.video}
-          allowsFullscreen
-          allowsPictureInPicture
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>Upload Video</Text>
+        <TouchableOpacity onPressIn={pickVideo} style={styles.button}>
+          <Text style={styles.buttonText}>Pick a video</Text>
+        </TouchableOpacity>
+        {video && player && (
+          <VideoView
+            player={player}
+            style={styles.video}
+            allowsFullscreen
+            allowsPictureInPicture
+          />
+        )}
+        <TextInput
+          style={styles.input}
+          placeholder="Add a caption..."
+          value={caption}
+          onChangeText={setCaption}
+          multiline
+          numberOfLines={3}
         />
-      )}
-      <TextInput
-        style={styles.input}
-        placeholder="Add a caption..."
-        value={caption}
-        onChangeText={setCaption}
-      />
-      <TouchableOpacity onPressIn={uploadVideo} disabled={!video || uploading} style={styles.button}>
-        {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Upload</Text>}
-      </TouchableOpacity>
-    </View>
+        <TouchableOpacity onPressIn={uploadVideo} disabled={!video || uploading} style={styles.button}>
+          {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Upload</Text>}
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollContent: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
     padding: 20,
     gap: 30,
   },
@@ -155,6 +170,8 @@ const styles = StyleSheet.create({
     padding: 10,
     width: '100%',
     marginBottom: 16,
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
   button: {
     backgroundColor: '#007bff',
@@ -162,6 +179,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 8,
     marginVertical: 8,
+    minWidth: 120,
   },
   buttonText: {
     color: '#fff',
