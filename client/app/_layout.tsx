@@ -47,6 +47,34 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
+        <Stack.Screen 
+          name="screens/UploadSinglePhotoScreen_fs" 
+          options={{ 
+            title: 'Upload Photo',
+            presentation: 'modal' 
+          }} 
+        />
+        <Stack.Screen 
+          name="screens/UploadMultiplePhotosScreen" 
+          options={{ 
+            title: 'Upload Photos',
+            presentation: 'modal' 
+          }} 
+        />
+        <Stack.Screen 
+          name="screens/UploadVideoScreen" 
+          options={{ 
+            title: 'Upload Video',
+            presentation: 'modal' 
+          }} 
+        />
+        <Stack.Screen 
+          name="screens/UploadTextScreen" 
+          options={{ 
+            title: 'Create Text Post',
+            presentation: 'modal' 
+          }} 
+        />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

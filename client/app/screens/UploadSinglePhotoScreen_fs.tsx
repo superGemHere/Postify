@@ -117,7 +117,7 @@ export default function UploadSinglePhotoScreen_fs() {
 				showsVerticalScrollIndicator={false}
 				keyboardShouldPersistTaps="handled"
 			>
-				<Text style={styles.title}>Upload Single Photo FSS</Text>
+				<Text style={styles.title}>Upload Single Photo</Text>
 				<TouchableOpacity onPressIn={pickImage} style={styles.button}>
 					<Text style={styles.buttonText}>Pick an image</Text>
 				</TouchableOpacity>
