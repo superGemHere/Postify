@@ -1,6 +1,6 @@
 import React, { useState, JSX } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Ionicons, MaterialIcons } from '@expo/vector-icons'
 import { useAuthStore } from '../store/authStore'
 import { GradientTitle } from './GradientTitle'
 import { SlideInDrawer } from './SlideInDrawer'
@@ -24,11 +24,21 @@ const CustomHeader = (): JSX.Element => {
             style={styles.drawerItem}
             onPress={() => {
               setDrawerVisible(false)
+              router.push('/screens/UploadTextScreen')
+            }}
+          >
+            <MaterialIcons name="library-books" size={22} color="#222" style={{ marginRight: 8 }} />
+            <Text style={styles.drawerItemText}>Upload Text Post</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.drawerItem}
+            onPress={() => {
+              setDrawerVisible(false)
               router.push('/screens/UploadSinglePhotoScreen_fs')
             }}
           >
             <Ionicons name="image-outline" size={22} color="#222" style={{ marginRight: 8 }} />
-            <Text style={styles.drawerItemText}>Upload Single Photo FS</Text>
+            <Text style={styles.drawerItemText}>Upload Single Photo</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.drawerItem}
