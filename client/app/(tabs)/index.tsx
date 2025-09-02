@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, Image } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { usePostStore, Post, Like, Comment } from '../../store/postStore';
@@ -21,11 +22,12 @@ const replaceComment = usePostStore(state => state.replaceComment);
 	const [hasMore, setHasMore] = useState(true);
 	const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
 	const [visibleItems, setVisibleItems] = useState<Set<string>>(new Set());
+	const [isScreenFocused, setIsScreenFocused] = useState(true);
 
 	const [replyingTo, setReplyingTo] = useState<{ [postId: string]: string | null }>({});
 
 	const user = useAuthStore(state => state.user);
-	const [userMap, setUserMap] = useState<{ [id: string]: { username: string; email: string } }>({});
+	const [userMap, setUserMap] = useState<{ [id: string]: { username: string; email: string; avatar_url?: string } }>({});
 
 	const POSTS_PER_PAGE = 20;
 
@@ -34,12 +36,16 @@ const replaceComment = usePostStore(state => state.replaceComment);
 		const uniqueIds = Array.from(new Set(userIds));
 		const { data, error } = await supabase
 			.from('profiles')
-			.select('id, username, email')
+			.select('id, username, email, avatar_url')
 			.in('id', uniqueIds);
 		if (!error && data) {
-			const map: { [id: string]: { username: string; email: string } } = {};
+			const map: { [id: string]: { username: string; email: string; avatar_url?: string } } = {};
 			data.forEach((u: any) => {
-				map[u.id] = { username: u.username || u.email || u.id, email: u.email };
+				map[u.id] = { 
+					username: u.username || u.email || u.id, 
+					email: u.email,
+					avatar_url: u.avatar_url
+				};
 			});
 			setUserMap(prev => ({ ...prev, ...map }));
 		}
@@ -71,6 +77,52 @@ const replaceComment = usePostStore(state => state.replaceComment);
 						: [],
 			}));
 			
+			const postIds = postsWithArray.map(p => p.id);
+			const postUserIds = postsWithArray.map(p => p.user_id);
+			
+			// Fetch comments and likes concurrently, then process everything
+			const [commentsResult, likesResult] = await Promise.all([
+				supabase
+					.from('comments')
+					.select('*')
+					.in('post_id', postIds)
+					.order('created_at', { ascending: true }),
+				supabase
+					.from('likes')
+					.select('*')
+					.in('post_id', postIds)
+			]);
+			
+			// Collect all user IDs (posts + comments)
+			const commentUserIds = commentsResult.data ? (commentsResult.data as Comment[]).map((c: any) => c.user_id) : [];
+			const allUserIds = [...new Set([...postUserIds, ...commentUserIds])];
+			
+			// Process everything in parallel - no dependencies between these operations
+			await Promise.all([
+				fetchUserMap(allUserIds),
+				// Process likes data
+				(async () => {
+					if (!likesResult.error && likesResult.data) {
+						const likesByPost: { [postId: string]: Like[] } = {};
+						(likesResult.data as Like[]).forEach(like => {
+							if (!likesByPost[like.post_id]) {
+								likesByPost[like.post_id] = [];
+							}
+							likesByPost[like.post_id].push(like);
+						});
+						Object.entries(likesByPost).forEach(([postId, likes]) => {
+							setLikes(postId, likes);
+						});
+					}
+				})(),
+				// Process comments data (just structures data, doesn't need userMap)
+				(async () => {
+					if (!commentsResult.error && commentsResult.data) {
+						processCommentsData(commentsResult.data as Comment[], postIds);
+					}
+				})()
+			]);
+			
 			if (isLoadMore) {
 				setPosts([...posts, ...postsWithArray]);
 			} else {
@@ -79,16 +131,6 @@ const replaceComment = usePostStore(state => state.replaceComment);
 			
 			// Check if there are more posts
 			setHasMore(data.length === POSTS_PER_PAGE);
-			
-			// Fetch userMap for post authors
-			const postUserIds = postsWithArray.map(p => p.user_id);
-			const postIds = postsWithArray.map(p => p.id);
-			
-			await Promise.all([
-				fetchUserMap(postUserIds),
-				fetchAllLikes(postIds),
-				fetchAllComments(postIds)
-			]);
 		}
 		
 		if (isLoadMore) {
@@ -98,71 +140,37 @@ const replaceComment = usePostStore(state => state.replaceComment);
 		}
 	};
 
-	const fetchAllLikes = async (postIds: string[]) => {
-		if (postIds.length === 0) return;
-		const { data, error } = await supabase
-			.from('likes')
-			.select('*')
-			.in('post_id', postIds);
-		if (!error && data) {
-			// Group likes by post_id
-			const likesByPost: { [postId: string]: Like[] } = {};
-			(data as Like[]).forEach(like => {
-				if (!likesByPost[like.post_id]) {
-					likesByPost[like.post_id] = [];
+	const processCommentsData = (commentsData: Comment[], postIds: string[]) => {
+		// Group comments by post_id and build nested structure
+		const commentsByPost: { [postId: string]: Comment[] } = {};
+		
+		// Build nested replies for each post
+		const postIdsFromComments = [...new Set(commentsData.map(c => c.post_id))];
+		postIdsFromComments.forEach(postId => {
+			const postComments = commentsData.filter(c => c.post_id === postId);
+			const commentMap: { [id: string]: Comment } = {};
+			const rootComments: Comment[] = [];
+			
+			postComments.forEach(comment => {
+				comment.replies = [];
+				commentMap[comment.id] = comment;
+			});
+			
+			postComments.forEach(comment => {
+				if (comment.parent_id && commentMap[comment.parent_id]) {
+					commentMap[comment.parent_id].replies!.push(comment);
+				} else {
+					rootComments.push(comment);
 				}
-				likesByPost[like.post_id].push(like);
-			});
-			// Set all likes at once
-			Object.entries(likesByPost).forEach(([postId, likes]) => {
-				setLikes(postId, likes);
-			});
-		}
-	};
-
-	const fetchAllComments = async (postIds: string[]) => {
-		if (postIds.length === 0) return;
-		const { data, error } = await supabase
-			.from('comments')
-			.select('*')
-			.in('post_id', postIds)
-			.order('created_at', { ascending: true });
-		if (!error && data) {
-			// Group comments by post_id and build nested structure
-			const commentsByPost: { [postId: string]: Comment[] } = {};
-			
-			// Build nested replies for each post
-			const postIdsFromComments = [...new Set((data as Comment[]).map(c => c.post_id))];
-			postIdsFromComments.forEach(postId => {
-				const postComments = (data as Comment[]).filter(c => c.post_id === postId);
-				const commentMap: { [id: string]: Comment } = {};
-				const rootComments: Comment[] = [];
-				
-				postComments.forEach(comment => {
-					comment.replies = [];
-					commentMap[comment.id] = comment;
-				});
-				
-				postComments.forEach(comment => {
-					if (comment.parent_id && commentMap[comment.parent_id]) {
-						commentMap[comment.parent_id].replies!.push(comment);
-					} else {
-						rootComments.push(comment);
-					}
-				});
-				
-				commentsByPost[postId] = rootComments;
 			});
 			
-			// Set all comments at once
-			Object.entries(commentsByPost).forEach(([postId, comments]) => {
-				setComments(postId, comments);
-			});
-			
-			// Fetch userMap for comment authors
-			const commentUserIds = (data as Comment[]).map((c: any) => c.user_id);
-			fetchUserMap(commentUserIds);
-		}
+			commentsByPost[postId] = rootComments;
+		});
+		
+		// Set all comments at once
+		Object.entries(commentsByPost).forEach(([postId, comments]) => {
+			setComments(postId, comments);
+		});
 	};
 
 	const fetchLikes = async (postId: string) => {
@@ -204,6 +212,18 @@ const replaceComment = usePostStore(state => state.replaceComment);
 		fetchPosts();
 	}, []);
 
+	// Handle screen focus/blur for video management
+	useFocusEffect(
+		useCallback(() => {
+			setIsScreenFocused(true);
+			return () => {
+				setIsScreenFocused(false);
+				// Clear visible items when screen loses focus to pause all videos
+				setVisibleItems(new Set());
+			};
+		}, [])
+	);
+
 	const onRefresh = async () => {
 		setRefreshing(true);
 		setHasMore(true);
@@ -218,13 +238,19 @@ const replaceComment = usePostStore(state => state.replaceComment);
 	};
 
 	const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+		// Only allow video playback if screen is focused
+		if (!isScreenFocused) {
+			setVisibleItems(new Set());
+			return;
+		}
+		
 		const visiblePostIds = new Set<string>(
 			viewableItems
 				.filter((item: any) => item.item.media_type === 'video')
 				.map((item: any) => item.item.id as string)
 		);
 		setVisibleItems(visiblePostIds);
-	}, []);
+	}, [isScreenFocused]);
 
 	const viewabilityConfig = {
 		itemVisiblePercentThreshold: 50, // 50% of the item must be visible
@@ -235,7 +261,7 @@ const replaceComment = usePostStore(state => state.replaceComment);
 			key={item.id}
 			user={user}
 			post={item}
-			isVisible={visibleItems.has(item.id)}
+			isVisible={visibleItems.has(item.id) && isScreenFocused}
 			userMap={userMap}
 			renderComments={renderComments}
 			likes={likes}
@@ -325,6 +351,11 @@ const handleLike = async (postId: string) => {
 					replies: [],
 				};
 				replaceComment(postId, tempId, realComment);
+				
+				// Ensure user data is fetched for the comment author
+				if (!userMap[user_id]) {
+					fetchUserMap([user_id]);
+				}
 			}
 		};
 

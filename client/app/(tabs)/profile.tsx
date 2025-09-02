@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, TextInput, ScrollView, Image } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { usePostStore } from '../../store/postStore';
@@ -24,11 +25,12 @@ export default function ProfileScreen() {
 	const [hasMore, setHasMore] = useState(true);
 	const [commentInputs, setCommentInputs] = useState<{ [postId: string]: string }>({});
 	const [visibleItems, setVisibleItems] = useState<Set<string>>(new Set());
+	const [isScreenFocused, setIsScreenFocused] = useState(true);
 	const [userPosts, setUserPosts] = useState<Post[]>([]);
-	const [userProfile, setUserProfile] = useState<{ username: string; email: string; post_count: number } | null>(null);
+	const [userProfile, setUserProfile] = useState<{ username: string; email: string; post_count: number; avatar_url?: string } | null>(null);
 	const [replyingTo, setReplyingTo] = useState<{ [postId: string]: string | null }>({});
 
-	const [userMap, setUserMap] = useState<{ [id: string]: { username: string; email: string } }>({});
+	const [userMap, setUserMap] = useState<{ [id: string]: { username: string; email: string; avatar_url?: string } }>({});
 
 	// Get posts from global store that belong to current user (for newly uploaded posts)
 	const globalUserPosts = posts.filter(post => post.user_id === user?.id);
@@ -52,7 +54,7 @@ export default function ProfileScreen() {
 		
 		const { data: profile, error: profileError } = await supabase
 			.from('profiles')
-			.select('username, email')
+			.select('username, email, avatar_url')
 			.eq('id', user.id)
 			.single();
 			
@@ -66,7 +68,8 @@ export default function ProfileScreen() {
 			setUserProfile({
 				username: profile.username || profile.email || user.email,
 				email: profile.email || user.email,
-				post_count: count || 0
+				post_count: count || 0,
+				avatar_url: profile.avatar_url
 			});
 		}
 	};
@@ -99,6 +102,48 @@ export default function ProfileScreen() {
 						: [],
 			}));
 			
+			const postIds = postsWithArray.map(p => p.id);
+			const postUserIds = postsWithArray.map(p => p.user_id);
+			
+			// Fetch comments and likes concurrently, then process everything
+			const [commentsResult, likesResult] = await Promise.all([
+				supabase
+					.from('comments')
+					.select('*')
+					.in('post_id', postIds)
+					.order('created_at', { ascending: true }),
+				supabase
+					.from('likes')
+					.select('*')
+					.in('post_id', postIds)
+			]);
+			
+			const commentUserIds = commentsResult.data ? (commentsResult.data as Comment[]).map((c: any) => c.user_id) : [];
+			const allUserIds = [...new Set([...postUserIds, ...commentUserIds])];
+			
+			await Promise.all([
+				fetchUserMap(allUserIds),
+				(async () => {
+					if (!likesResult.error && likesResult.data) {
+						const likesByPost: { [postId: string]: Like[] } = {};
+						(likesResult.data as Like[]).forEach(like => {
+							if (!likesByPost[like.post_id]) {
+								likesByPost[like.post_id] = [];
+							}
+							likesByPost[like.post_id].push(like);
+						});
+						Object.entries(likesByPost).forEach(([postId, likes]) => {
+							setLikes(postId, likes);
+						});
+					}
+				})(),
+				(async () => {
+					if (!commentsResult.error && commentsResult.data) {
+						processCommentsData(commentsResult.data as Comment[], postIds);
+					}
+				})()
+			]);
+			
 			if (isLoadMore) {
 				// For load more, append to existing local user posts
 				setUserPosts([...userPosts, ...postsWithArray]);
@@ -109,12 +154,6 @@ export default function ProfileScreen() {
 			
 			// Check if there are more posts
 			setHasMore(data.length === POSTS_PER_PAGE);
-			
-			const postIds = postsWithArray.map(p => p.id);
-			await Promise.all([
-				fetchAllLikes(postIds),
-				fetchAllComments(postIds)
-			]);
 		}
 		
 		if (isLoadMore) {
@@ -124,71 +163,37 @@ export default function ProfileScreen() {
 		}
 	};
 
-	const fetchAllLikes = async (postIds: string[]) => {
-		if (postIds.length === 0) return;
-		const { data, error } = await supabase
-			.from('likes')
-			.select('*')
-			.in('post_id', postIds);
-		if (!error && data) {
-			// Group likes by post_id
-			const likesByPost: { [postId: string]: Like[] } = {};
-			(data as Like[]).forEach(like => {
-				if (!likesByPost[like.post_id]) {
-					likesByPost[like.post_id] = [];
+	const processCommentsData = (commentsData: Comment[], postIds: string[]) => {
+		// Group comments by post_id and build nested structure
+		const commentsByPost: { [postId: string]: Comment[] } = {};
+		
+		// Build nested replies for each post
+		const postIdsFromComments = [...new Set(commentsData.map(c => c.post_id))];
+		postIdsFromComments.forEach(postId => {
+			const postComments = commentsData.filter(c => c.post_id === postId);
+			const commentMap: { [id: string]: Comment } = {};
+			const rootComments: Comment[] = [];
+			
+			postComments.forEach(comment => {
+				comment.replies = [];
+				commentMap[comment.id] = comment;
+			});
+			
+			postComments.forEach(comment => {
+				if (comment.parent_id && commentMap[comment.parent_id]) {
+					commentMap[comment.parent_id].replies!.push(comment);
+				} else {
+					rootComments.push(comment);
 				}
-				likesByPost[like.post_id].push(like);
-			});
-			// Set all likes at once
-			Object.entries(likesByPost).forEach(([postId, likes]) => {
-				setLikes(postId, likes);
-			});
-		}
-	};
-
-	const fetchAllComments = async (postIds: string[]) => {
-		if (postIds.length === 0) return;
-		const { data, error } = await supabase
-			.from('comments')
-			.select('*')
-			.in('post_id', postIds)
-			.order('created_at', { ascending: true });
-		if (!error && data) {
-			// Group comments by post_id and build nested structure
-			const commentsByPost: { [postId: string]: Comment[] } = {};
-			
-			// Build nested replies for each post
-			const postIdsFromComments = [...new Set((data as Comment[]).map(c => c.post_id))];
-			postIdsFromComments.forEach(postId => {
-				const postComments = (data as Comment[]).filter(c => c.post_id === postId);
-				const commentMap: { [id: string]: Comment } = {};
-				const rootComments: Comment[] = [];
-				
-				postComments.forEach(comment => {
-					comment.replies = [];
-					commentMap[comment.id] = comment;
-				});
-				
-				postComments.forEach(comment => {
-					if (comment.parent_id && commentMap[comment.parent_id]) {
-						commentMap[comment.parent_id].replies!.push(comment);
-					} else {
-						rootComments.push(comment);
-					}
-				});
-				
-				commentsByPost[postId] = rootComments;
 			});
 			
-			// Set all comments at once
-			Object.entries(commentsByPost).forEach(([postId, comments]) => {
-				setComments(postId, comments);
-			});
-			
-			// Fetch userMap for comment authors
-			const commentUserIds = (data as Comment[]).map((c: any) => c.user_id);
-			fetchUserMap(commentUserIds);
-		}
+			commentsByPost[postId] = rootComments;
+		});
+		
+		// Set all comments at once
+		Object.entries(commentsByPost).forEach(([postId, comments]) => {
+			setComments(postId, comments);
+		});
 	};
 
 	const fetchUserMap = async (userIds: string[]) => {
@@ -196,12 +201,16 @@ export default function ProfileScreen() {
 		const uniqueIds = Array.from(new Set(userIds));
 		const { data, error } = await supabase
 			.from('profiles')
-			.select('id, username, email')
+			.select('id, username, email, avatar_url')
 			.in('id', uniqueIds);
 		if (!error && data) {
-			const map: { [id: string]: { username: string; email: string } } = {};
+			const map: { [id: string]: { username: string; email: string; avatar_url?: string } } = {};
 			data.forEach((u: any) => {
-				map[u.id] = { username: u.username || u.email || u.id, email: u.email };
+				map[u.id] = { 
+					username: u.username || u.email || u.id, 
+					email: u.email,
+					avatar_url: u.avatar_url
+				};
 			});
 			setUserMap(prev => ({ ...prev, ...map }));
 		}
@@ -213,6 +222,18 @@ export default function ProfileScreen() {
 			fetchUserPosts();
 		}
 	}, [user]);
+
+	// Handle screen focus/blur for video management
+	useFocusEffect(
+		useCallback(() => {
+			setIsScreenFocused(true);
+			return () => {
+				setIsScreenFocused(false);
+				// Clear visible items when screen loses focus to pause all videos
+				setVisibleItems(new Set());
+			};
+		}, [])
+	);
 
 	// Effect to update post count when posts change
 	useEffect(() => {
@@ -241,13 +262,19 @@ export default function ProfileScreen() {
 	};
 
 	const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+		// Only allow video playback if screen is focused
+		if (!isScreenFocused) {
+			setVisibleItems(new Set());
+			return;
+		}
+		
 		const visiblePostIds = new Set<string>(
 			viewableItems
 				.filter((item: any) => item.item.media_type === 'video')
 				.map((item: any) => item.item.id as string)
 		);
 		setVisibleItems(visiblePostIds);
-	}, []);
+	}, [isScreenFocused]);
 
 	const viewabilityConfig = {
 		itemVisiblePercentThreshold: 50,
@@ -306,6 +333,11 @@ export default function ProfileScreen() {
 				replies: [],
 			};
 			replaceComment(postId, tempId, realComment);
+			
+			// Ensure user data is fetched for the comment author
+			if (!userMap[user_id]) {
+				fetchUserMap([user_id]);
+			}
 		}
 	};
 
@@ -370,7 +402,7 @@ export default function ProfileScreen() {
 			key={item.id}
 			user={user}
 			post={item}
-			isVisible={visibleItems.has(item.id)}
+			isVisible={visibleItems.has(item.id) && isScreenFocused}
 			userMap={userMap}
 			renderComments={renderComments}
 			likes={likes}
@@ -399,7 +431,11 @@ export default function ProfileScreen() {
 				<>
 					<View style={styles.profileInfo}>
 						<View style={styles.avatar}>
-							<IconSymbol name="person.fill" size={40} color="#999" />
+							{userProfile.avatar_url ? (
+								<Image source={{ uri: userProfile.avatar_url }} style={styles.avatarImage} />
+							) : (
+								<IconSymbol name="person.fill" size={40} color="#999" />
+							)}
 						</View>
 						<View style={styles.userDetails}>
 							<Text style={styles.username}>{userProfile.username}</Text>
@@ -498,6 +534,11 @@ const styles = StyleSheet.create({
 		marginRight: 16,
 		justifyContent: 'center',
 		alignItems: 'center',
+	},
+	avatarImage: {
+		width: 80,
+		height: 80,
+		borderRadius: 40,
 	},
 	userDetails: {
 		flex: 1,
