@@ -103,7 +103,7 @@ export default function UploadTextScreen() {
 				</View>
 
 				<TouchableOpacity 
-					onPress={uploadTextPost} 
+					onPressIn={uploadTextPost} 
 					disabled={!text.trim() || uploading || charCount > maxChars} 
 					style={[
 						styles.button,
