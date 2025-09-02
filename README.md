@@ -1,15 +1,20 @@
 # Postify
 
-A modern social media mobile application for sharing photos and videos, built with React Native, Expo, and Supabase. Features Instagram-like functionality with optimistic updates, infinite scroll, and video autoplay.
+A modern social media mobile application for sharing photos, videos, and text posts, built with React Native, Expo, and Supabase. Features Instagram-like functionality with optimistic updates, infinite scroll, video autoplay, and user avatars.
 
 ## 🚀 Features
 
-- **Multi-media Posts**: Upload single/multiple photos and videos
+- **Multi-media Posts**: Upload single/multiple photos, videos, and text-only posts
+- **Text Posts**: Create text-only posts with character limit
+- **Profile Avatars**: Required avatar upload during user registration
+- **User Profiles**: Dedicated profile screen showing user's posts, avatar, and statistics
 - **Real-time Feed**: Infinite scroll with pagination (20 posts per page)
 - **Interactive Engagement**: Like posts and threaded comments with replies
 - **Video Autoplay**: Videos automatically play when in view, pause when out of view
+- **Tab-aware Video Management**: Videos pause when switching between tabs
 - **Optimistic Updates**: Instant UI updates for likes, comments, and posts
-- **Authentication**: Email/password auth with email confirmation
+- **Authentication**: Email/password auth with email confirmation and mandatory avatar upload
+- **Performance Optimized**: Parallel data fetching with Promise.all for faster loading
 - **Responsive UI**: Modern design with smooth animations and carousels
 
 ## 📋 Prerequisites
@@ -56,6 +61,7 @@ CREATE TABLE profiles (
   id UUID REFERENCES auth.users(id) PRIMARY KEY,
   username TEXT,
   email TEXT,
+  avatar_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -64,7 +70,7 @@ CREATE TABLE posts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) NOT NULL,
   media_urls TEXT[] NOT NULL,
-  media_type TEXT NOT NULL CHECK (media_type IN ('image', 'video')),
+  media_type TEXT NOT NULL CHECK (media_type IN ('image', 'video', 'text')),
   caption TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -94,10 +100,11 @@ CREATE TABLE comments (
 Create storage buckets in Supabase:
 
 1. Go to Storage in your Supabase dashboard
-2. Create two buckets:
+2. Create three buckets:
    - `photos` (for image uploads)
    - `videos` (for video uploads)
-3. Set both buckets to **public**
+   - `avatars` (for user profile pictures)
+3. Set all buckets to **public**
 4. Configure the following policies for each bucket:
 
 **Photos Bucket Policies:**
@@ -107,6 +114,10 @@ Create storage buckets in Supabase:
 **Videos Bucket Policies:**
 - **Authenticated users can read videos** (SELECT, authenticated)
 - **Authenticated users can upload videos** (INSERT, authenticated)
+
+**Avatars Bucket Policies:**
+- **Authenticated users can read avatars** (SELECT, authenticated)
+- **Authenticated users can upload avatars** (INSERT, authenticated)
 
 ### 6. Run the Application
 
@@ -163,20 +174,22 @@ replaceLike(tempId, realLike);
 ```sql
 id          UUID (PK, FK → auth.users)
 username    TEXT
-email       TEXT  
+email       TEXT
+avatar_url  TEXT (URL to avatar in storage)
 created_at  TIMESTAMP
 ```
-*Extends Supabase auth.users with additional profile data*
+*Extends Supabase auth.users with profile data and avatar*
 
 #### **`posts`**
 ```sql
 id          UUID (PK)
 user_id     UUID (FK → auth.users)
-media_urls  TEXT[] (Array of storage URLs)
-media_type  TEXT ('image' | 'video')
-caption     TEXT
+media_urls  TEXT[] (Array of storage URLs, empty for text posts)
+media_type  TEXT ('image' | 'video' | 'text')
+caption     TEXT (content for text posts)
 created_at  TIMESTAMP
 ```
+*Supports image, video, and text-only posts*
 *Supports both single and multiple media uploads*
 
 #### **`likes`**
@@ -220,7 +233,14 @@ videos/
 │   └── ...
 ```
 
-*Organized by user ID for easy management and security*
+#### **`avatars/`**
+```
+avatars/
+├── {user_id}/
+│   └── avatar.{ext}
+```
+
+*All storage organized by user ID for security and management*
 
 ## 🎯 Key Architecture Decisions
 
@@ -237,24 +257,46 @@ videos/
 - **Native Modules**: Easy access to device capabilities
 - **OTA Updates**: Update apps without app store approval
 
-### **3. Video Autoplay Implementation**
+### **3. Text Posts Implementation**
 ```typescript
-// FlatList viewability detection
+// Text-only posts with character limit
+const handleTextPost = async (content: string) => {
+  const textPost = {
+    media_urls: [], // Empty for text posts
+    media_type: 'text',
+    caption: content
+  };
+  
+  await uploadPost(textPost);
+};
+```
+
+### **4. Video Autoplay with Tab Management**
+```typescript
+// FlatList viewability + tab focus detection
 const onViewableItemsChanged = ({ viewableItems }) => {
+  if (!isScreenFocused) return; // Pause videos when tab inactive
+  
   const visibleVideos = viewableItems
     .filter(item => item.item.media_type === 'video')
     .map(item => item.item.id);
   setVisibleItems(new Set(visibleVideos));
 };
+```
 
-// Auto-play based on visibility
-useEffect(() => {
-  if (isVisible && videoPlayer) {
-    videoPlayer.play();
-  } else {
-    videoPlayer.pause();
-  }
-}, [isVisible, videoPlayer]);
+### **5. Avatar Upload During Registration**
+```typescript
+// Required avatar upload with registration
+const register = async (email, password, name, avatarUri) => {
+  // 1. Create user account
+  const { user } = await supabase.auth.signUp({ email, password });
+  
+  // 2. Upload avatar to avatars bucket
+  const avatarUrl = await uploadAvatar(user.id, avatarUri);
+  
+  // 3. Update profile with avatar URL
+  await updateProfile({ avatar_url: avatarUrl });
+};
 ```
 
 ### **4. Infinite Scroll with Pagination**
