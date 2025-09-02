@@ -75,6 +75,10 @@ const PostCard: React.FC<PostCardProps> = ({
 				/>
 			) : post.media_type === 'image' && post.media_urls && post.media_urls.length > 0 ? (
 				<PostCarousel images={post.media_urls} />
+			) : post.media_type === 'text' ? (
+				<View style={styles.textPostContainer}>
+					<Text style={styles.textPostContent}>{post.caption}</Text>
+				</View>
 			) : null}
 			<View style={styles.actionsRow}>
 				<TouchableOpacity onPressIn={() => handleLike(post.id)}>
@@ -84,7 +88,11 @@ const PostCard: React.FC<PostCardProps> = ({
 				</TouchableOpacity>
 				<Text style={styles.likesCount}>{likes[post.id]?.length || 0} likes</Text>
 			</View>
-			<Text style={styles.caption}><Text style={styles.username}>{userMap[post.user_id]?.username || post.user_id}</Text> {post.caption}</Text>
+			{post.media_type !== 'text' && (
+				<Text style={styles.caption}>
+					<Text style={styles.username}>{userMap[post.user_id]?.username || post.user_id}</Text> {post.caption}
+				</Text>
+			)}
 			<Text style={styles.meta}>{new Date(post.created_at).toLocaleString()}</Text>
 			<View style={styles.commentsSection}>
 				{comments[post.id] && renderComments(comments[post.id], post.id)}
@@ -210,5 +218,20 @@ const styles = StyleSheet.create({
 		fontWeight: 'bold',
 		fontSize: 14,
 		marginLeft: 6,
+	},
+	textPostContainer: {
+		backgroundColor: '#f8f9fa',
+		borderRadius: 12,
+		padding: 20,
+		marginBottom: 12,
+		borderWidth: 1,
+		borderColor: '#e9ecef',
+		minHeight: 80,
+	},
+	textPostContent: {
+		fontSize: 18,
+		lineHeight: 26,
+		color: '#222',
+		fontFamily: 'System',
 	},
 })
