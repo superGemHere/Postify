@@ -1,28 +1,5 @@
 import { supabase } from './supabase';
-
-export interface Post {
-  id: string;
-  user_id: string;
-  media_url: string;
-  media_type: string;
-  caption: string;
-  created_at: string;
-}
-
-export interface Like {
-  id: string;
-  post_id: string;
-  user_id: string;
-  created_at: string;
-}
-
-export interface Comment {
-  id: string;
-  post_id: string;
-  user_id: string;
-  content: string;
-  created_at: string;
-}
+import {Post, Like, Comment} from '@/types/Post';
 
 export async function fetchPosts(limit = 20) {
   const { data, error } = await supabase
